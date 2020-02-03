@@ -22,7 +22,7 @@
   (cond
     ;; union query
     (map? query)
-    {}
+    (throw (ex-info "union queries not supported yet." {:model submodel}))
 
     ;; normal query
     (vector? query)
@@ -39,13 +39,15 @@
                              (assoc acc field
                                     (mapv (fn [field-ident]
                                             (let [field-entity (get-in db field-ident)]
-                                              (denormalize-shallow-entity db contextual-model field-entity)))
+                                              (denormalize-shallow-entity
+                                               db contextual-model field-entity)))
                                           field-idents)))
                 (if (keyword? head)
                   (assoc acc head (get entity head))
                   (do
-                    (throw (ex-info "entry in query is not recognized." {:acc  acc
-                                                                         :head head}))
+                    (throw (ex-info "entry in query is not recognized." {:acc   acc
+                                                                         :head  head
+                                                                         :model submodel}))
                     acc))))
             {}
             query)))
@@ -64,6 +66,11 @@
                                           data)
     ;; assume shallow-entity
     :else                           (denormalize-shallow-entity db querymodel data)))
+
+
+(defn tree->db
+  [querymodel data]
+  )
 
 (def bar-model
   {:id :bar/id
