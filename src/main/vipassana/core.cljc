@@ -1,4 +1,30 @@
-(ns vipassana.core)
+(ns vipassana.core
+  (:require
+   [clojure.spec.alpha :as s]
+   [ghostwheel.core :as g :refer [>defn >defn- >fdef => | <- ?]]))
+
+(s/def ::id keyword?)
+
+(s/def ::ident #(= (::type (meta %)) :ident))
+
+(s/def ::link (s/and ::ident #(= 1 (count %))))
+
+(s/def ::join-one (s/and #(= (::type (meta %)) :join-one)
+                         (s/tuple keyword? ::model)))
+
+(s/def ::join-many (s/and #(= (::type (meta %)) :join-many)
+                          (s/tuple keyword? ::model)))
+
+(s/def ::query-element
+  (s/or :field keyword?
+        :link ::link
+        :join-one ::join-one
+        :join-many ::join-many))
+
+(s/def ::query (s/coll-of ::query-element))
+
+(s/def ::model
+  (s/keys :req-un [::id ::query]))
 
 (defn annotate-ident [x]
   (with-meta x {::type :ident}))
@@ -15,7 +41,14 @@
 (defn with-query [model query]
   (assoc model :query query))
 
-(defn denormalize-shallow-entity
+(defn deep-merge
+"Merges nested maps without overwriting existing keys."
+  [& xs]
+  (if (every? map? xs)
+    (apply merge-with deep-merge xs)
+    (last xs)))
+
+(defn denormalize
   "the object level. like `{:foo/id 0, :foo/field1 1, :foo/bar [:bar 0]}`
   "
   [db {:keys [query] :as submodel} entity]
@@ -31,7 +64,7 @@
                 :join-one  (let [[field contextual-model] head
                                  field-ident              (get entity field)
                                  field-entity             (get-in db field-ident)
-                                 expanded-entity          (denormalize-shallow-entity
+                                 expanded-entity          (denormalize
                                                            db contextual-model field-entity)]
                              (assoc acc field expanded-entity))
                 :join-many (let [[field contextual-model] head
@@ -39,7 +72,7 @@
                              (assoc acc field
                                     (mapv (fn [field-ident]
                                             (let [field-entity (get-in db field-ident)]
-                                              (denormalize-shallow-entity
+                                              (denormalize
                                                db contextual-model field-entity)))
                                           field-idents)))
                 (if (keyword? head)
@@ -57,47 +90,76 @@
   {:id :foo/id, query [:foo/id :foo/field1]}."
   [db querymodel data]
   (cond
-    (= (::type (meta data)) :ident) (denormalize-shallow-entity db querymodel (get-in db data))
+    (= (::type (meta data)) :ident) (denormalize db querymodel (get-in db data))
     (vector? data)                  (mapv (fn [datum]
                                             (if (= (::type datum) :ident)
-                                              (denormalize-shallow-entity db querymodel (get-in db datum))
+                                              (denormalize db querymodel (get-in db datum))
                                               ;; assume shallow-entity
-                                              (denormalize-shallow-entity db querymodel datum)))
+                                              (denormalize db querymodel datum)))
                                           data)
     ;; assume shallow-entity
-    :else                           (denormalize-shallow-entity db querymodel data)))
+    :else                           (denormalize db querymodel data)))
 
+(>defn normalize
+  [query-or-model data]
+  [(s/or :query ::query
+         :model ::model) map? => map?]
+  (let [id-key (:id query-or-model)
+        id     (get data id-key)]
+    #_(when-not (and id-key id)
+        (throw (ex-info "Passed a model but data doesn't have id")))
+    (cond
+      ;; query-or-model is a model
+      (and id-key id)
+      (let [model            query-or-model
+            ident            #v/ident [id-key id]
+            {sub-data :data
+             sub-dict :dict} (normalize (:query model) data)]
+        {:data ident
+         :dict (merge {id-key {id sub-data}}
+                      sub-dict)})
+
+      ;; query-or-model is a query
+      (and (not id-key) (vector? query-or-model))
+      (let [query query-or-model]
+        (reduce (fn [acc query-element]
+                  (case (::type (meta query-element))
+                    :join-one  (let [[field context-model] query-element
+                                     sub-entity            (get data field)
+                                     {sub-data :data
+                                      sub-dict :dict}      (normalize context-model sub-entity)]
+                                 (-> acc
+                                     (assoc-in [:data field] sub-data)
+                                     (update :dict deep-merge sub-dict)))
+                    :join-many (let [[field context-model] query-element
+                                     sub-entities          (get data field)
+                                     {sub-data :data
+                                      sub-dict :dict}      (reduce (fn [acc sub-entity]
+                                                                     (let [{sub-data :data
+                                                                            sub-dict :dict} (normalize context-model sub-entity)]
+                                                                       (-> acc
+                                                                           (update-in [:data] conj sub-data)
+                                                                           (update :dict deep-merge sub-dict))))
+                                                                   {:data [] :dict {}}
+                                                                   sub-entities)]
+                                 (-> acc
+                                     (assoc-in [:data field] sub-data)
+                                     (update :dict deep-merge sub-dict))
+                                 )
+                    (if (keyword? query-element)
+                      (assoc-in acc [:data query-element] (get data query-element))
+                      (do (throw (ex-info "entry in query is not recognized." {:acc            acc
+                                                                               :query-element  query-element
+                                                                               :query-or-model query-or-model}))
+                          acc))))
+                {:data {} :dict {}}
+                query))
+
+      :else
+      (throw (ex-info "Something went wrong" {:query-or-model query-or-model
+                                              :data           data}))
+      )))
 
 (defn tree->db
   [querymodel data]
-  )
-
-(def bar-model
-  {:id :bar/id
-   :query [:bar/id
-           :bar/field1]})
-
-(def baz-model
-  {:id :baz/id
-   :query [:baz/id
-           :baz/field1]})
-
-(def foo-model
-  {:id :foo/id
-   :query [:foo/id
-           :foo/field1
-           #v/join-one [:foo/bar bar-model]
-           #v/join-many [:foo/baz baz-model]]})
-
-(def foo-example
-  {:foo/id     0
-   :foo/field1 1
-   :foo/bar    {:bar/id     0
-                :bar/field1 10}
-   :foo/baz    [{:baz/id     0
-                 :baz/field1 10}
-                {:baz/id     1
-                 :baz/field2 20}]})
-
-(def foo-ident-example
-  #v/ident [:foo 0])
+  (normalize querymodel data))

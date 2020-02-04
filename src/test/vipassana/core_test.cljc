@@ -59,3 +59,8 @@
                           #v/join-one [:foo/bar (v/with-query bar-model
                                                   [:bar/id])]])
                        #v/ident [:foo/id 0])))))
+
+(deftest test-normalize
+  (testing "normalize"
+    (is (= test-db
+           (:dict (v/normalize foo-model foo-example))))))

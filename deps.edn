@@ -1,2 +1,6 @@
-{:deps {}
- :paths ["src/main" "src/test"]}
+{:deps    {
+           gnl/ghostwheel {:mvn/version "0.3.9"}
+           }
+ :paths   ["src/main" "src/test"]
+ :aliases {:dev {:jvm-opts    ["-Dghostwheel.enabled=true"]
+                 :extra-paths ["src/test"]}}}
