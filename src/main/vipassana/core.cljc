@@ -26,6 +26,9 @@
 (s/def ::model
   (s/keys :req-un [::id ::query]))
 
+(s/def ::query-or-model
+  (s/or :query ::query :model ::model))
+
 (defn annotate-ident [x]
   (with-meta x {::type :ident}))
 
@@ -101,64 +104,67 @@
     :else                           (denormalize db querymodel data)))
 
 (>defn normalize
-  [query-or-model data]
-  [(s/or :query ::query
-         :model ::model) map? => map?]
-  (let [id-key (:id query-or-model)
-        id     (get data id-key)]
-    #_(when-not (and id-key id)
-        (throw (ex-info "Passed a model but data doesn't have id")))
-    (cond
-      ;; query-or-model is a model
-      (and id-key id)
-      (let [model            query-or-model
-            ident            #v/ident [id-key id]
-            {sub-data :data
-             sub-dict :dict} (normalize (:query model) data)]
-        {:data ident
-         :dict (merge {id-key {id sub-data}}
-                      sub-dict)})
+  ([query-or-model subtree]
+   [::query-or-model map? => map?]
+   (normalize query-or-model subtree
+              {:on-not-found (constantly nil)}))
+  ([query-or-model subtree {:keys [on-not-found] :as config}]
+   [::query-or-mode map? map? => map?]
+   (let [id-key (:id query-or-model)
+         id     (get subtree id-key)]
+     #_(when-not (and id-key id)
+         (throw (ex-info "Passed a model but data doesn't have id")))
+     (cond
+       (nil? subtree)
+       (on-not-found query-or-model subtree)
+       ;; query-or-model is a model
+       (and id-key id)
+       (let [model            query-or-model
+             ident            #v/ident [id-key id]
+             {sub-data :data
+              sub-dict :dict} (normalize (:query model) subtree config)]
+         {:data ident
+          :dict (merge {id-key {id sub-data}}
+                       sub-dict)})
 
-      ;; query-or-model is a query
-      (and (not id-key) (vector? query-or-model))
-      (let [query query-or-model]
-        (reduce (fn [acc query-element]
-                  (case (::type (meta query-element))
-                    :join-one  (let [[field context-model] query-element
-                                     sub-entity            (get data field)
-                                     {sub-data :data
-                                      sub-dict :dict}      (normalize context-model sub-entity)]
-                                 (-> acc
-                                     (assoc-in [:data field] sub-data)
-                                     (update :dict deep-merge sub-dict)))
-                    :join-many (let [[field context-model] query-element
-                                     sub-entities          (get data field)
-                                     {sub-data :data
-                                      sub-dict :dict}      (reduce (fn [acc sub-entity]
-                                                                     (let [{sub-data :data
-                                                                            sub-dict :dict} (normalize context-model sub-entity)]
-                                                                       (-> acc
-                                                                           (update-in [:data] conj sub-data)
-                                                                           (update :dict deep-merge sub-dict))))
-                                                                   {:data [] :dict {}}
-                                                                   sub-entities)]
-                                 (-> acc
-                                     (assoc-in [:data field] sub-data)
-                                     (update :dict deep-merge sub-dict))
-                                 )
-                    (if (keyword? query-element)
-                      (assoc-in acc [:data query-element] (get data query-element))
-                      (do (throw (ex-info "entry in query is not recognized." {:acc            acc
-                                                                               :query-element  query-element
-                                                                               :query-or-model query-or-model}))
-                          acc))))
-                {:data {} :dict {}}
-                query))
+       ;; query-or-model is a query
+       (and (not id-key) (vector? query-or-model))
+       (let [query query-or-model]
+         (reduce (fn [acc query-element]
+                   (case (::type (meta query-element))
+                     :join-one  (let [[field context-model] query-element
+                                      sub-entity            (get subtree field)
+                                      {out-data :data
+                                       out-dict :dict}      (normalize context-model sub-entity config)]
+                                  (-> acc
+                                      (assoc-in [:data field] out-data)
+                                      (update :dict deep-merge out-dict)))
+                     :join-many (let [[field context-model] query-element
+                                      sub-entities          (get subtree field)
+                                      {sub-data :data
+                                       sub-dict :dict}      (reduce (fn [acc sub-entity]
+                                                                      (let [{sub-data :data
+                                                                             sub-dict :dict} (normalize context-model sub-entity config)]
+                                                                        (-> acc
+                                                                            (update-in [:data] conj sub-data)
+                                                                            (update :dict deep-merge sub-dict))))
+                                       {:data [] :dict {}}
+                                       sub-entities)]
+                                  (-> acc
+                                      (assoc-in [:data field] sub-data)
+                                      (update :dict deep-merge sub-dict)))
+                     (if (keyword? query-element)
+                       (assoc-in acc [:data query-element] (get subtree query-element))
+                       (do (throw (ex-info "entry in query is not recognized." {:acc            acc
+                                                                                :query-element  query-element
+                                                                                :query-or-model query-or-model}))
+                           acc))))
+                 {:data {} :dict {}}
+                 query))
 
-      :else
-      (throw (ex-info "Something went wrong" {:query-or-model query-or-model
-                                              :data           data}))
-      )))
+       :else
+       (throw (ex-info "Something went wrong" {:query-or-model query-or-model
+                                               :subtree        subtree}))))))
 
 (defn tree->db
   [querymodel data]

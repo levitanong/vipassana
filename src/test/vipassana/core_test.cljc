@@ -46,6 +46,55 @@
             1 {:baz/id     1
                :baz/field1 20}}})
 
+(def place-model
+  {:id :place/id
+   :query [:place/id
+           :place/primary
+           :place/secondary
+           :place/location]})
+
+(def participant-model
+  {:id :participant/id
+   :query [:participant/id
+           :participant/alias
+           :participant/icon
+           #v/join-one [:participant/place place-model]]})
+
+(def participants
+  [{:participant/id       0
+    :participant/icon     "mouse-tail"
+    :participant/alias    "Me"
+    :ui/geocoding-mode    :forward
+    :ui/place-placeholder "Freelance, Bahay ko, Krusty Krab"
+    :participant/place    {:place/id       "temporary-server-generated-0"
+                           :place/primary  "Ateneo de Manila University, Katipunan Ave"
+                           :place/location {:latitude 14.638607, :longitude 121.076782}}
+    :ui/temp-place        {:place/id       "temporary-server-generated-0"
+                           :place/primary  "Ateneo de Manila University, Katipunan Ave"
+                           :place/location {:latitude 14.638607, :longitude 121.076782}}}
+   {:participant/id       1
+    :participant/icon     "koala-bamboo"
+    :participant/alias    "Bae"
+    :ui/geocoding-mode    :forward
+    :ui/place-placeholder "Sa Metro Manila, E di sa puso mo, Freelance"}])
+
+(def participant-data+dict
+  {:data {:value [[:participant/id 0] [:participant/id 1]]},
+   :dict
+   {:participant/id
+    {0 #:participant{:id    0,
+                     :alias "Me",
+                     :icon  "mouse-tail",
+                     :place [:place/id "temporary-server-generated-0"]},
+     1 #:participant{:id 1, :alias "Bae", :icon "koala-bamboo", :place nil}},
+    :place/id
+    {"temporary-server-generated-0"
+     #:place{:id        "temporary-server-generated-0",
+             :primary   "Ateneo de Manila University, Katipunan Ave",
+             :secondary nil,
+             :location  {:latitude 14.638607, :longitude 121.076782}}}}})
+
+
 (deftest test-db->tree
   (testing "db->tree"
     (is (= foo-example
@@ -63,4 +112,7 @@
 (deftest test-normalize
   (testing "normalize"
     (is (= test-db
-           (:dict (v/normalize foo-model foo-example))))))
+           (:dict (v/normalize foo-model foo-example))))
+    (is (= participant-data+dict
+           (v/tree->db [#v/join-many [:value participant-model]]
+                       {:value participants})))))
