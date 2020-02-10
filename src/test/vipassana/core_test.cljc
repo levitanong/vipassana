@@ -4,21 +4,21 @@
    [clojure.test :as test :refer [is testing deftest]]))
 
 (def bar-model
-  {:id :bar/id
-   :query [:bar/id
-           :bar/field1]})
+  {:id-key :bar/id
+   :fields [:bar/id
+            :bar/field1]})
 
 (def baz-model
-  {:id :baz/id
-   :query [:baz/id
-           :baz/field1]})
+  {:id-key :baz/id
+   :fields [:baz/id
+            :baz/field1]})
 
 (def foo-model
-  {:id :foo/id
-   :query [:foo/id
-           :foo/field1
-           #v/join-one [:foo/bar bar-model]
-           #v/join-many [:foo/baz baz-model]]})
+  {:id-key :foo/id
+   :fields [:foo/id
+            :foo/field1
+            #v/join-one [:foo/bar bar-model]
+            #v/join-many [:foo/baz baz-model]]})
 
 (def foo-example
   {:foo/id     0
@@ -47,18 +47,18 @@
                :baz/field1 20}}})
 
 (def place-model
-  {:id :place/id
-   :query [:place/id
-           :place/primary
-           :place/secondary
-           :place/location]})
+  {:id-key :place/id
+   :fields [:place/id
+            :place/primary
+            :place/secondary
+            :place/location]})
 
 (def participant-model
-  {:id :participant/id
-   :query [:participant/id
-           :participant/alias
-           :participant/icon
-           #v/join-one [:participant/place place-model]]})
+  {:id-key :participant/id
+   :fields [:participant/id
+            :participant/alias
+            :participant/icon
+            #v/join-one [:participant/place place-model]]})
 
 (def participants
   [{:participant/id       0
@@ -98,16 +98,31 @@
 (deftest test-db->tree
   (testing "db->tree"
     (is (= foo-example
-           (v/db->tree test-db foo-model #v/ident [:foo/id 0]))))
+           (v/db->tree foo-model #v/ident [:foo/id 0] test-db))))
   (testing "db->tree, subquery"
     (is (= {:foo/id  0
             :foo/bar {:bar/id 0}}
-           (v/db->tree test-db
-                       (v/with-query foo-model
+           (v/db->tree (v/with-fields foo-model
                          [:foo/id
-                          #v/join-one [:foo/bar (v/with-query bar-model
+                          #v/join-one [:foo/bar (v/with-fields bar-model
                                                   [:bar/id])]])
-                       #v/ident [:foo/id 0])))))
+                       #v/ident [:foo/id 0]
+                       test-db))))
+  (testing "db->tree, union"
+    (is (= {:onions [{:foo/id 0 :foo/field1 1}
+                     {:bar/id 0 :bar/field1 10}
+                     {:baz/id 0 :baz/field1 10}]}
+           (v/db->tree [#v/join-many [:onions (into #{}
+                                                    (map (fn [model]
+                                                           (let [model-ns (namespace (:id-key model))]
+                                                             (v/with-fields model
+                                                               [(keyword model-ns "id")
+                                                                (keyword model-ns "field1")]))))
+                                                    #{foo-model bar-model baz-model})]]
+                       {:onions [#v/ident [:foo/id 0]
+                                 #v/ident [:bar/id 0]
+                                 #v/ident [:baz/id 0]]}
+                       test-db)))))
 
 (deftest test-normalize
   (testing "normalize"
