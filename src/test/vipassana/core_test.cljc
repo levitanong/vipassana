@@ -127,7 +127,7 @@
 (deftest test-normalize
   (testing "normalize"
     (is (= test-db
-           (:dict (v/normalize foo-model foo-example))))
+           (:dict (v/tree->db foo-model foo-example))))
     (is (= participant-data+dict
            (v/tree->db [#v/join-many [:value participant-model]]
                        {:value participants})))))

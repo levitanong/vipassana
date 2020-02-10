@@ -121,6 +121,7 @@
 
     (vector? query)
     {:type     :anon-query
+     :query    query
      :children (mapv (fn [subquery]
                        (query->ast subquery))
                      query)}
@@ -176,7 +177,8 @@
                                   (update-in [:dict] deep-merge dict))))
                           {}
                           children))
-    :prop       {:data tree}
+    :prop       {:data tree
+                 :dict {}}
 
     (throw (ex-info "Invalid AST" {:ast  ast
                                    :tree tree}))))
