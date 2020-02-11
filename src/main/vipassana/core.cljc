@@ -156,8 +156,10 @@
     :join-one   (let [{:keys [dispatch-key
                               children]} ast
                       [child-node]       children]
-                  (when tree
-                    (normalize child-node tree)))
+                  (if tree
+                    (normalize child-node tree)
+                    {:data nil
+                     :dict {}}))
     :join-many  (let [{:keys [dispatch-key
                               children]} ast
                       [child-node]       children]
