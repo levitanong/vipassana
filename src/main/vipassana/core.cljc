@@ -197,8 +197,9 @@
                     (ident? data) (denormalize child-node (get-in db data) db)
                     ;; data already partially inflated
                     (map? data)   (denormalize child-node data db)
+                    (nil? data)   {:data nil :dict {}}
                     :else         (throw (ex-info "Invalid data at ast node" {:data data
-                                                                              :ast ast}))))
+                                                                              :ast  ast}))))
     :ident      (throw (ex-info "idents and lookup refs are not yet supported"
                                 {:ast  ast
                                  :data data}))
