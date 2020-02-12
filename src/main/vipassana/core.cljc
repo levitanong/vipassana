@@ -178,20 +178,21 @@
     :join-one   (let [{:keys [dispatch-key
                               children]} ast
                       [child-node]       children]
-                  (if tree
-                    (normalize child-node tree)
-                    {:data nil
-                     :dict {}}))
+                  (if (nil? tree)
+                    {:data nil :dict {}}
+                    (normalize child-node tree)))
     :join-many  (let [{:keys [dispatch-key
                               children]} ast
                       [child-node]       children]
-                  (reduce (fn [acc element]
-                            (let [{:keys [data dict]} (normalize child-node element)]
-                              (-> acc
-                                  (update-in [:data] safe-conj data)
-                                  (update-in [:dict] deep-merge dict))))
-                          {}
-                          tree))
+                  (if (nil? tree)
+                    {:data nil :dict {}}
+                    (reduce (fn [acc element]
+                              (let [{:keys [data dict]} (normalize child-node element)]
+                                (-> acc
+                                    (update-in [:data] safe-conj data)
+                                    (update-in [:dict] deep-merge dict))))
+                            {}
+                            tree)))
     :anon-query (let [{:keys [children]} ast]
                   (reduce (fn [acc {:keys [dispatch-key] :as child-node}]
                             (let [subtree             (get tree dispatch-key)
@@ -199,7 +200,7 @@
                               (-> acc
                                   (assoc-in [:data dispatch-key] data)
                                   (update-in [:dict] deep-merge dict))))
-                          {}
+                          {:data nil :dict {}}
                           children))
     :prop       {:data tree
                  :dict {}}
