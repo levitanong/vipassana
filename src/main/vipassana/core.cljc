@@ -79,6 +79,12 @@
                       (get remap accessor field)))
                   fields))))
 
+(defn without-fields [model query-blacklist]
+  (update model :fields
+          (fn [fields]
+            (filterv (complement query-blacklist)
+                     fields))))
+
 (defn deep-merge
 "Merges nested maps without overwriting existing keys."
   [& xs]
