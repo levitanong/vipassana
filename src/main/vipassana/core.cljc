@@ -51,6 +51,16 @@
 (defn with-fields [model query]
   (assoc model :fields query))
 
+(defn with-remap [model remap]
+  (update model :fields
+          (fn [fields]
+            (mapv (fn [field]
+                    (get remap
+                         (if (or (join-one? field) (join-many? field))
+                           (first field)
+                           field)))
+                  fields))))
+
 (defn deep-merge
 "Merges nested maps without overwriting existing keys."
   [& xs]
