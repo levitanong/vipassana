@@ -48,6 +48,24 @@
 (defn annotate-model [x]
   (with-meta x {::type :model}))
 
+(defn join-one?
+  [subquery]
+  (= :join-one (::type (meta subquery))))
+
+(defn join-many?
+  [subquery]
+  (= :join-many (::type (meta subquery))))
+
+(defn ident?
+  [subquery]
+  (= :ident (::type (meta subquery))))
+
+(defn model? [x]
+  (when (coll? x)
+    (contains? x :id-key)))
+
+
+
 (defn with-fields [model query]
   (assoc model :fields query))
 
@@ -72,22 +90,6 @@
   (if (sequential? xs)
     (conj xs x)
     [x]))
-
-(defn join-one?
-  [subquery]
-  (= :join-one (::type (meta subquery))))
-
-(defn join-many?
-  [subquery]
-  (= :join-many (::type (meta subquery))))
-
-(defn ident?
-  [subquery]
-  (= :ident (::type (meta subquery))))
-
-(defn model? [x]
-  (when (coll? x)
-    (contains? x :id-key)))
 
 (defn query->ast
   [query]
