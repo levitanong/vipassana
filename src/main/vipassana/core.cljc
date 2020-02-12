@@ -55,10 +55,10 @@
   (update model :fields
           (fn [fields]
             (mapv (fn [field]
-                    (get remap
-                         (if (or (join-one? field) (join-many? field))
-                           (first field)
-                           field)))
+                    (let [accessor (if (or (join-one? field) (join-many? field))
+                                     (first field)
+                                     field)]
+                      (get remap accessor field)))
                   fields))))
 
 (defn deep-merge
