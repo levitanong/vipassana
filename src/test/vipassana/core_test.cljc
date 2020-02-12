@@ -20,6 +20,11 @@
             #v/join-one [:foo/bar bar-model]
             #v/join-many [:foo/baz baz-model]]})
 
+(def foo-1-model
+  {:id-key :foo/id
+   :fields [:foo/id
+            :foo/field]})
+
 (def foo-example
   {:foo/id     0
    :foo/field1 1
@@ -180,7 +185,20 @@
                        {:onions [#v/ident [:foo/id 0]
                                  #v/ident [:bar/id 0]
                                  #v/ident [:baz/id 0]]}
-                       test-db)))))
+                       test-db))))
+  (testing "db->tree, link-ref"
+    (is (= {:herpes [{:foo/id 0 :foo/field1 3 :root/derpes 1}
+                     {:foo/id 1 :foo/field1 2 :root/derpes 1}]}
+           (v/db->tree [#v/join-many [:herpes (v/with-fields foo-1-model
+                                                [:foo/id
+                                                 :foo/field1
+                                                 #v/ident [:root/derpes]])]]
+                       {:herpes [#v/ident [:foo/id 0] #v/ident [:foo/id 1]]}
+                       {:foo/id      {0 {:foo/id     0
+                                         :foo/field1 3}
+                                      1 {:foo/id     1
+                                         :foo/field1 2}}
+                        :root/derpes 1})))))
 
 (deftest test-normalize
   (testing "normalize"

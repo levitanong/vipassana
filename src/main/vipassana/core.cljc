@@ -128,7 +128,7 @@
       (when-not field-key (throw (ex-info "Join-one had no field-key!" {:query query})))
       {:type         :join-one
        :query        query
-       :dispatch-key field-key
+       :dispatch-key (if (ident? field-key) (first field-key) field-key)
        :key          field-key
        :children     [(query->ast subquery)]})
 
@@ -223,9 +223,8 @@
                     (nil? data)   {:data nil :dict {}}
                     :else         (throw (ex-info "Invalid data at ast node" {:data data
                                                                               :ast  ast}))))
-    :ident      (throw (ex-info "idents and lookup refs are not yet supported"
-                                {:ast  ast
-                                 :data data}))
+    :ident      (let [{:keys [key]} ast]
+                  (get-in db key))
     :union      (let [{:keys [children]}  ast
                       matching-child-node (->> children
                                                (filter (fn [{:keys [id-key]}]
