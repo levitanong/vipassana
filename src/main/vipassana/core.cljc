@@ -159,14 +159,18 @@
 (defn normalize
   [{:keys [type] :as ast} tree]
   (case type
-    :model      (let [{:keys [id-key
-                              children]}  ast
-                      [child-node]        children
-                      id                  (get tree id-key)
-                      ident               #v/ident [id-key id]
-                      {:keys [data dict]} (normalize child-node tree)]
-                  {:data ident
-                   :dict (assoc-in dict ident data)})
+    :model      (if (ident? tree)
+                  ;; Already normalized, so stop.
+                  {:data tree
+                   :dict {}}
+                  (let [{:keys [id-key
+                                children]}  ast
+                        [child-node]        children
+                        id                  (get tree id-key)
+                        ident               #v/ident [id-key id]
+                        {:keys [data dict]} (normalize child-node tree)]
+                    {:data ident
+                     :dict (assoc-in dict ident data)}))
     ;; ident is a no-op
     :ident      (throw (ex-info "Idents do not make sense during normalization" {:ast ast}))
     :union      (let [{:keys [children]}  ast
