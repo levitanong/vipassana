@@ -192,11 +192,16 @@
                               children]} ast
                       [child-node]       children]
                   ;; child-node should be of type :anon-query
-                  (if (ident? data)
-                    ;; use partially inflated data
-                    (denormalize child-node (get-in db data) db)
+                  (cond
+                    ;; expand an ident
+                    (ident? data) (denormalize child-node (get-in db data) db)
                     ;; data already partially inflated
-                    (denormalize child-node data db)))
+                    (map? data)   (denormalize child-node data db)
+                    :else         (throw (ex-info "Invalid data at ast node" {:data data
+                                                                              :ast ast}))))
+    :ident      (throw (ex-info "idents and lookup refs are not yet supported"
+                                {:ast  ast
+                                 :data data}))
     :union      (let [{:keys [children]}  ast
                       matching-child-node (->> children
                                                (filter (fn [{:keys [id-key]}]
