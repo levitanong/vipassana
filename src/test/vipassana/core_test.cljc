@@ -1,4 +1,4 @@
-(ns test.vipassana.core-test
+(ns vipassana.core-test
   (:require
    [vipassana.core :as v]
    [clojure.test :as test :refer [is testing deftest]]))
