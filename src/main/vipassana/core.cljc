@@ -82,7 +82,11 @@
 (defn without-fields [model query-blacklist]
   (update model :fields
           (fn [fields]
-            (filterv (complement query-blacklist)
+            (filterv (fn [field]
+                       (let [accessor (if (or (join-one? field) (join-many? field))
+                                        (first field)
+                                        field)]
+                         (not (contains? query-blacklist accessor))))
                      fields))))
 
 (defn deep-merge
