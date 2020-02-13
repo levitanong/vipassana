@@ -36,17 +36,14 @@
 (s/def ::query-or-model
   (s/or :query ::query :model ::model))
 
-(defn annotate-ident [x]
+(defn as-ident [x]
   (with-meta x {::type :ident}))
 
-(defn annotate-join-one [x]
+(defn join-one [x]
   (with-meta x {::type :join-one}))
 
-(defn annotate-join-many [x]
+(defn join-many [x]
   (with-meta x {::type :join-many}))
-
-(defn annotate-model [x]
-  (with-meta x {::type :model}))
 
 (defn join-one?
   [subquery]
@@ -167,10 +164,10 @@
                                 children]}  ast
                         [child-node]        children
                         id                  (get tree id-key)
-                        ident               #v/ident [id-key id]
+                        model-ident         (as-ident [id-key id])
                         {:keys [data dict]} (normalize child-node tree)]
-                    {:data ident
-                     :dict (assoc-in dict ident data)}))
+                    {:data model-ident
+                     :dict (assoc-in dict model-ident data)}))
     ;; ident is a no-op
     :ident      (throw (ex-info "Idents do not make sense during normalization" {:ast ast}))
     :union      (let [{:keys [children]}  ast
@@ -244,8 +241,8 @@
     :join-many  (let [{:keys [dispatch-key
                               children]} ast
                       [child-node]       children]
-                  (reduce (fn [acc ident]
-                            (conj acc (denormalize child-node ident db)))
+                  (reduce (fn [acc model-ident]
+                            (conj acc (denormalize child-node model-ident db)))
                           []
                           data))
     :anon-query (let [{:keys [children]} ast]

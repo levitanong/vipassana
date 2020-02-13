@@ -17,8 +17,8 @@
   {:id-key :foo/id
    :fields [:foo/id
             :foo/field1
-            #v/join-one [:foo/bar bar-model]
-            #v/join-many [:foo/baz baz-model]]})
+            (v/join-one [:foo/bar bar-model])
+            (v/join-many [:foo/baz baz-model])]})
 
 (def foo-1-model
   {:id-key :foo/id
@@ -36,34 +36,20 @@
                  :baz/field1 20}]})
 
 (def foo-ident-example
-  #v/ident [:foo/id 0])
+  (v/as-ident [:foo/id 0]))
 
 (def test-db
   {:foo/id {0 {:foo/id     0
                :foo/field1 1
-               :foo/bar    #v/ident [:bar/id 0]
-               :foo/baz    [#v/ident [:baz/id 0]
-                            #v/ident [:baz/id 1]]}}
+               :foo/bar    (v/as-ident [:bar/id 0])
+               :foo/baz    [(v/as-ident [:baz/id 0])
+                            (v/as-ident [:baz/id 1])]}}
    :bar/id {0 {:bar/id     0
                :bar/field1 10}}
    :baz/id {0 {:baz/id     0
                :baz/field1 10}
             1 {:baz/id     1
                :baz/field1 20}}})
-
-;; (def place-model
-;;   {:id-key :place/id
-;;    :fields [:place/id
-;;             :place/primary
-;;             :place/secondary
-;;             :place/location]})
-
-;; (def participant-model
-;;   {:id-key :participant/id
-;;    :fields [:participant/id
-;;             :participant/alias
-;;             :participant/icon
-;;             #v/join-one [:participant/place place-model]]})
 
 (def participants
   [{:participant/id       0
@@ -114,8 +100,8 @@
    :fields [:participant/id
             :participant/icon
             :participant/alias
-            #v/join-one [:participant/place place-model]
-            #v/join-one [:ui/temp-place place-model]
+            (v/join-one [:participant/place place-model])
+            (v/join-one [:ui/temp-place place-model])
             :ui/geocoding-mode
             :ui/place-placeholder]})
 
@@ -161,39 +147,40 @@
 (deftest test-db->tree
   (testing "db->tree"
     (is (= foo-example
-           (v/db->tree foo-model #v/ident [:foo/id 0] test-db))))
+           (v/db->tree foo-model (v/as-ident [:foo/id 0]) test-db))))
   (testing "db->tree, subquery"
     (is (= {:foo/id  0
             :foo/bar {:bar/id 0}}
            (v/db->tree (v/with-fields foo-model
                          [:foo/id
-                          #v/join-one [:foo/bar (v/with-fields bar-model
-                                                  [:bar/id])]])
-                       #v/ident [:foo/id 0]
+                          (v/join-one [:foo/bar (v/with-fields bar-model
+                                                  [:bar/id])])])
+                       (v/as-ident [:foo/id 0])
                        test-db))))
   (testing "db->tree, union"
     (is (= {:onions [{:foo/id 0 :foo/field1 1}
                      {:bar/id 0 :bar/field1 10}
                      {:baz/id 0 :baz/field1 10}]}
-           (v/db->tree [#v/join-many [:onions (into #{}
+           (v/db->tree [(v/join-many [:onions (into #{}
                                                     (map (fn [model]
                                                            (let [model-ns (namespace (:id-key model))]
                                                              (v/with-fields model
                                                                [(keyword model-ns "id")
                                                                 (keyword model-ns "field1")]))))
-                                                    #{foo-model bar-model baz-model})]]
-                       {:onions [#v/ident [:foo/id 0]
-                                 #v/ident [:bar/id 0]
-                                 #v/ident [:baz/id 0]]}
+                                                    #{foo-model bar-model baz-model})])]
+                       {:onions [(v/as-ident [:foo/id 0])
+                                 (v/as-ident [:bar/id 0])
+                                 (v/as-ident [:baz/id 0])]}
                        test-db))))
   (testing "db->tree, link-ref"
     (is (= {:herpes [{:foo/id 0 :foo/field1 3 :root/derpes 1}
                      {:foo/id 1 :foo/field1 2 :root/derpes 1}]}
-           (v/db->tree [#v/join-many [:herpes (v/with-fields foo-1-model
+           (v/db->tree [(v/join-many [:herpes (v/with-fields foo-1-model
                                                 [:foo/id
                                                  :foo/field1
-                                                 #v/ident [:root/derpes]])]]
-                       {:herpes [#v/ident [:foo/id 0] #v/ident [:foo/id 1]]}
+                                                 (v/as-ident [:root/derpes])])])]
+                       {:herpes [(v/as-ident [:foo/id 0])
+                                 (v/as-ident [:foo/id 1])]}
                        {:foo/id      {0 {:foo/id     0
                                          :foo/field1 3}
                                       1 {:foo/id     1
@@ -205,15 +192,15 @@
     (is (= test-db
            (:dict (v/tree->db foo-model foo-example))))
     (is (= participant-data+dict
-           (v/tree->db [#v/join-many [:value (v/with-fields participant-model
+           (v/tree->db [(v/join-many [:value (v/with-fields participant-model
                                                [:participant/id
                                                 :participant/alias
                                                 :participant/icon
-                                                #v/join-one [:participant/place (v/with-fields place-model
+                                                (v/join-one [:participant/place (v/with-fields place-model
                                                                                   [:place/id
                                                                                    :place/location
                                                                                    :place/primary
-                                                                                   :place/secondary])]])]]
+                                                                                   :place/secondary])])])])]
                        {:value participants})))
     (is (= {:participant/id {0 {:participant/id       0,
                                 :participant/icon     "amphibian-frog",
@@ -247,7 +234,7 @@
                              "Shopping Center"
                              {:category/id "Shopping Center", :category/enabled? true}}}
            (:dict
-            (v/tree->db [#v/join-many [:root/participants participant-model]
-                         #v/join-many [:root/categories category-model]
-                         #v/join-one [:root/candidate candidate-model]]
+            (v/tree->db [(v/join-many [:root/participants participant-model])
+                         (v/join-many [:root/categories category-model])
+                         (v/join-one [:root/candidate candidate-model])]
                         test-tree-1))))))

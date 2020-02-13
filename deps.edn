@@ -2,5 +2,10 @@
            gnl/ghostwheel {:mvn/version "0.3.9"}
            }
  :paths   ["src/main"]
- :aliases {:dev {:jvm-opts    ["-Dghostwheel.enabled=true"]
-                 :extra-paths ["src/test"]}}}
+ :aliases {:dev      {:jvm-opts    ["-Dghostwheel.enabled=true"]
+                      :extra-paths ["src/test"]}
+           :test-clj {:extra-paths ["src/test"]
+                      :extra-deps  {com.cognitect/test-runner
+                                    {:git/url "https://github.com/cognitect-labs/test-runner.git"
+                                     :sha     "f7ef16dc3b8332b0d77bc0274578ad5270fbfedd"}}
+                      :main-opts   ["-m" "cognitect.test-runner"]}}}
