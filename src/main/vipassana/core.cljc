@@ -39,6 +39,8 @@
 (defn as-ident [x]
   (with-meta x {::type :ident}))
 
+(def ident as-ident)
+
 (defn join-one [x]
   (with-meta x {::type :join-one}))
 
