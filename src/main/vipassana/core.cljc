@@ -36,8 +36,25 @@
 (s/def ::query-or-model
   (s/or :query ::query :model ::model))
 
+(defrecord Ident [x])
+
+#?(:clj
+   (defmethod print-method Ident [r ^java.io.Writer writer]
+     (.write writer "#ident ")
+     (print-method (:x r) writer))
+   :cljs
+   (extend-protocol IPrintWithWriter
+     Ident
+     (-pr-writer [x writer _]
+       (write-all writer "#ident " x))))
+
+#?(:clj
+   (defmethod print-dup Ident [o w]
+     (print-method o w)))
+
 (defn as-ident [x]
-  (with-meta x {::type :ident}))
+  (Ident. x)
+  #_(with-meta x {::type :ident}))
 
 (def ident as-ident)
 
