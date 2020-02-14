@@ -194,7 +194,7 @@
                                 (-> acc
                                     (update-in [:data] safe-conj data)
                                     (update-in [:dict] deep-merge dict))))
-                            {}
+                            {:data nil :dict {}}
                             tree)))
     :anon-query (let [{:keys [children]} ast]
                   (reduce (fn [acc {:keys [dispatch-key] :as child-node}]
