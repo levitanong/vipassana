@@ -1,7 +1,70 @@
 (ns vipassana.core-test
   (:require
    [vipassana.core :as v]
+   [vipassana.core2 :as v2]
    [clojure.test :as test :refer [is testing deftest]]))
+
+(def bar-schema
+  {:bar/id     :id
+   :bar/field1 :prop
+   :bar/field2 :prop})
+
+(def foo-schema
+  {:foo/id        :id
+   :foo/field1    :prop
+   :foo/field2    :prop
+   :foo/bar       [:join-one bar-schema]
+   [:root/field1 '_] :prop})
+
+[:foo/id {:foo/bar [:bar/field1]}]
+
+{:foo/id  0
+ :foo/bar {:bar/field1 1}}
+
+(def foo-schema1
+  (merge foo-schema
+         {(v/ident [:root/field1]) :prop
+          (v/ident [:bar/id 0]) [:join-one bar-schema]}))
+
+(def root-schema
+  {:root/foos   [:join-many foo-schema]
+   :root/field1 :prop})
+
+(def arbitrary-schema
+  {(v/ident [:root/foos]) [:join-many foo-schema]
+   })
+
+(deftest test-schema->ast
+  (testing "schema"
+    (is (= (v2/schema->ast foo-schema)
+           {:type     :schema
+            :id-key   :foo/id
+            :children [{:type         :id
+                        :key          :foo/id
+                        :dispatch-key :foo/id}
+                       {:type         :prop
+                        :key          :foo/field1
+                        :dispatch-key :foo/field1}
+                       {:type         :prop
+                        :key          :foo/field2
+                        :dispatch-key :foo/field2}
+                       {:type         :join-one
+                        :key          :foo/bar
+                        :dispatch-key :foo/bar
+                        :children     [{:type     :schema
+                                        :id-key   :bar/id
+                                        :children [{:type         :id
+                                                    :key          :bar/id
+                                                    :dispatch-key :bar/id}
+                                                   {:type         :prop
+                                                    :key          :bar/field1
+                                                    :dispatch-key :bar/field1}
+                                                   {:type         :prop
+                                                    :key          :bar/field2
+                                                    :dispatch-key :bar/field2}]}]}
+                       {:type         :prop
+                        :key          [:root/field1 '_]
+                        :dispatch-key :root/field1}]}))))
 
 (def bar-model
   {:id-key :bar/id
