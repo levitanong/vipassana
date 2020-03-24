@@ -234,7 +234,8 @@
                                                          (let [[table id] data]
                                                            (= id-key table))))
                                                (first))]
-                  (denormalize matching-child-node data db))
+                  (when matching-child-node
+                    (denormalize matching-child-node data db)))
     :join-one   (let [{:keys [dispatch-key
                               children]} ast
                       [child-node]       children]
